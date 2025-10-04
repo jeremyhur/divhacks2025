@@ -173,8 +173,8 @@ while True:
     # Display the song recommendation if it exists
     if song_recommendation:
         # Create a dedicated interface in the top-right corner
-        interface_width = 400
-        interface_height = 120
+        interface_width = 500
+        interface_height = 140
         start_x = frame.shape[1] - interface_width - 10
         start_y = 10
         
@@ -183,13 +183,13 @@ while True:
         cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 255, 255), 2)
         
         # Display reasoning (top line)
-        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         
-        # Display song recommendation (middle line)
-        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        # Display song recommendation (middle line) - with more space
+        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         # Display why this song fits (bottom line)
-        cv2.putText(frame, song_why, (start_x + 10, start_y + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
+        cv2.putText(frame, song_why, (start_x + 10, start_y + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
 
     cv2.imshow('AI Music Recommender', frame)
 
@@ -203,8 +203,8 @@ while True:
         song_why = "Please wait..."
         # Update the frame immediately to show the "getting recommendation" message
         # Create a dedicated interface in the top-right corner
-        interface_width = 400
-        interface_height = 120
+        interface_width = 500
+        interface_height = 140
         start_x = frame.shape[1] - interface_width - 10
         start_y = 10
         
@@ -213,9 +213,9 @@ while True:
         cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 255, 255), 2)
         
         # Display loading messages
-        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, song_why, (start_x + 10, start_y + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
+        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, song_why, (start_x + 10, start_y + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
         cv2.imshow('AI Music Recommender', frame)
         cv2.waitKey(1) # Allow UI to refresh
         
