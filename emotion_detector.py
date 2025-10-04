@@ -75,24 +75,47 @@ print("All models loaded.")
 # --- 4. Helper Function for Song Recommendation ---
 def get_song_recommendation(emotion):
     if not gemini_model:
-        return "Gemini API not configured."
+        return "Gemini API not configured.", "Please configure your API key."
         
     prompt = f"""
-    You are a music recommendation expert.
-    Based on the emotion '{emotion}', recommend one great song from Spotify.
-    The song should be well-known and fit the mood perfectly.
-    Please format your response ONLY as: Song Title - Artist
+    You are a music recommendation expert and emotional wellness coach.
+    The user is currently feeling '{emotion}'. 
+    
+    Please provide:
+    1. A brief, encouraging explanation of why this emotion is valid and what it means
+    2. A perfect song recommendation that matches this emotional state
+    3. A short reason why this song fits their current mood
+    
+    Format your response EXACTLY like this:
+    REASONING: [Your encouraging explanation about their emotion]
+    SONG: [Song Title - Artist]
+    WHY: [Why this song fits their mood]
     """
     try:
         print(f"Asking Gemini for a '{emotion}' song recommendation...")
         response = gemini_model.generate_content(prompt)
-        # Clean up the response text
-        song = response.text.strip()
-        print(f"Gemini recommended: {song}")
-        return song
+        # Parse the response
+        response_text = response.text.strip()
+        print(f"Gemini response: {response_text}")
+        
+        # Extract the different parts
+        reasoning = "You're feeling great!"
+        song = "No song available"
+        why = "Music can enhance your mood!"
+        
+        lines = response_text.split('\n')
+        for line in lines:
+            if line.startswith('REASONING:'):
+                reasoning = line.replace('REASONING:', '').strip()
+            elif line.startswith('SONG:'):
+                song = line.replace('SONG:', '').strip()
+            elif line.startswith('WHY:'):
+                why = line.replace('WHY:', '').strip()
+        
+        return song, reasoning, why
     except Exception as e:
         print(f"Error calling Gemini API: {e}")
-        return "API Error."
+        return "API Error.", "Unable to get recommendation.", "Please try again later."
 
 
 # --- 5. Main Video Processing Loop ---
@@ -108,6 +131,8 @@ print("Press 'q' to quit.")
 
 current_emotion = "neutral"
 song_recommendation = ""
+song_reasoning = ""
+song_why = ""
 
 while True:
     success, frame = cap.read()
@@ -150,8 +175,12 @@ while True:
 
     # Display the song recommendation if it exists
     if song_recommendation:
-        cv2.putText(frame, "Recommendation:", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, song_recommendation, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        # Display reasoning
+        cv2.putText(frame, song_reasoning, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        # Display song recommendation
+        cv2.putText(frame, f"Song: {song_recommendation}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        # Display why this song fits
+        cv2.putText(frame, song_why, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
 
     cv2.imshow('AI Music Recommender', frame)
 
@@ -161,14 +190,17 @@ while True:
         break
     if key == ord('s'):
         song_recommendation = "Getting recommendation..."
+        song_reasoning = "Analyzing your emotions..."
+        song_why = "Please wait..."
         # Update the frame immediately to show the "getting recommendation" message
-        cv2.putText(frame, "Recommendation:", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, song_recommendation, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(frame, song_reasoning, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.putText(frame, f"Song: {song_recommendation}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, song_why, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
         cv2.imshow('AI Music Recommender', frame)
         cv2.waitKey(1) # Allow UI to refresh
         
         # Get the actual recommendation
-        song_recommendation = get_song_recommendation(current_emotion)
+        song_recommendation, song_reasoning, song_why = get_song_recommendation(current_emotion)
 
 
 cap.release()
