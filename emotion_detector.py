@@ -78,18 +78,15 @@ def get_song_recommendation(emotion):
         return "Gemini API not configured.", "Please configure your API key."
         
     prompt = f"""
-    You are a music recommendation expert and emotional wellness coach.
+    You are a music recommendation expert.
     The user is currently feeling '{emotion}'. 
     
-    Please provide:
-    1. A brief, encouraging explanation of why this emotion is valid and what it means
-    2. A perfect song recommendation that matches this emotional state
-    3. A short reason why this song fits their current mood
+    Please provide SHORT responses (max 2-3 words for reasoning, 1-2 words for why):
     
     Format your response EXACTLY like this:
-    REASONING: [Your encouraging explanation about their emotion]
+    REASONING: [Very brief emotion validation - 2-3 words max]
     SONG: [Song Title - Artist]
-    WHY: [Why this song fits their mood]
+    WHY: [Why this song fits - 1-2 words max]
     """
     try:
         print(f"Asking Gemini for a '{emotion}' song recommendation...")
@@ -175,12 +172,24 @@ while True:
 
     # Display the song recommendation if it exists
     if song_recommendation:
-        # Display reasoning
-        cv2.putText(frame, song_reasoning, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        # Display song recommendation
-        cv2.putText(frame, f"Song: {song_recommendation}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        # Display why this song fits
-        cv2.putText(frame, song_why, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
+        # Create a dedicated interface in the top-right corner
+        interface_width = 400
+        interface_height = 120
+        start_x = frame.shape[1] - interface_width - 10
+        start_y = 10
+        
+        # Draw background rectangle for the interface
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 0, 0), -1)
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 255, 255), 2)
+        
+        # Display reasoning (top line)
+        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        
+        # Display song recommendation (middle line)
+        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Display why this song fits (bottom line)
+        cv2.putText(frame, song_why, (start_x + 10, start_y + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
 
     cv2.imshow('AI Music Recommender', frame)
 
@@ -190,12 +199,23 @@ while True:
         break
     if key == ord('s'):
         song_recommendation = "Getting recommendation..."
-        song_reasoning = "Analyzing your emotions..."
+        song_reasoning = "Analyzing emotions..."
         song_why = "Please wait..."
         # Update the frame immediately to show the "getting recommendation" message
-        cv2.putText(frame, song_reasoning, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        cv2.putText(frame, f"Song: {song_recommendation}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, song_why, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
+        # Create a dedicated interface in the top-right corner
+        interface_width = 400
+        interface_height = 120
+        start_x = frame.shape[1] - interface_width - 10
+        start_y = 10
+        
+        # Draw background rectangle for the interface
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 0, 0), -1)
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 255, 255), 2)
+        
+        # Display loading messages
+        cv2.putText(frame, song_reasoning, (start_x + 10, start_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(frame, song_recommendation, (start_x + 10, start_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, song_why, (start_x + 10, start_y + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
         cv2.imshow('AI Music Recommender', frame)
         cv2.waitKey(1) # Allow UI to refresh
         
