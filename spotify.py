@@ -2,7 +2,10 @@
 # pip install ultralytics opencv-python numpy huggingface_hub supervision deepface google-generativeai elevenlabs spotipy
 
 # --- 1. Load Libraries ---
-import cv2
+try:
+    import cv2
+except ImportError:
+    raise SystemExit("ERROR: OpenCV (cv2) is not installed. Install dependencies with:\n/usr/bin/python3 -m pip install --upgrade -r requirements.txt")
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
 from supervision import Detections
@@ -55,15 +58,34 @@ except KeyError:
     eleven_client = None
 
 # --- SPOTIFY --- Configure Spotipy
-try:
-    # Set the scope: permissions your script is asking for.
-    # 'user-modify-playback-state' is needed to control playback.
-    scope = "user-read-playback-state user-modify-playback-state"
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
-    print("Spotify API configured successfully.")
-except Exception as e:
-    print(f"ERROR: Could not configure Spotify. Check environment variables. Details: {e}")
+# Check required environment variables first to give a clear error when missing or invalid.
+required_vars = ["SPOTIPY_CLIENT_ID", "SPOTIPY_CLIENT_SECRET", "SPOTIPY_REDIRECT_URI"]
+missing = [v for v in required_vars if v not in os.environ or not os.environ.get(v)]
+if missing:
+    print("ERROR: Missing Spotify environment variables:", ", ".join(missing))
+    print("Please create a Spotify Developer app and set the following environment variables in your shell:")
+    print("export SPOTIPY_CLIENT_ID=\"your_client_id\"")
+    print("export SPOTIPY_CLIENT_SECRET=\"your_client_secret\"")
+    print("export SPOTIPY_REDIRECT_URI=\"http://localhost:8888/callback\"")
     sp = None
+else:
+    try:
+        # Set the scope: permissions your script is asking for.
+        # 'user-modify-playback-state' is needed to control playback.
+        scope = "user-read-playback-state user-modify-playback-state"
+        sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+        print("Spotify API configured successfully.")
+    except Exception as e:
+        # Spotipy/Spotify may return an invalid_client error if the client id/secret
+        # are incorrect or the Redirect URI registered in the Developer Dashboard
+        # doesn't match SPOTIPY_REDIRECT_URI. Print helpful diagnostics.
+        print("ERROR: Could not configure Spotify. Details:", e)
+        print("Common causes:")
+        print(" - SPOTIPY_CLIENT_ID or SPOTIPY_CLIENT_SECRET are incorrect")
+        print(" - SPOTIPY_REDIRECT_URI does not exactly match the redirect URI in your Spotify app settings")
+        print(" - Your Spotify app is not set to 'Client Credentials' or has been deleted/disabled")
+        print("Check the Spotify Developer Dashboard: https://developer.spotify.com/dashboard/applications")
+        sp = None
 # -----------------------------------------------
 
 
