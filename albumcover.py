@@ -273,6 +273,52 @@ def get_and_speak_recommendation(emotion, recommendation_data):
         recommendation_data[1] = "Check console."
         recommendation_data[2] = ""
 
+import time
+
+def monitor_spotify_playback():
+    """Continuously checks Spotify playback every few seconds."""
+    global current_emotion, recommendation_data
+
+    print("Starting Spotify playback monitor...")
+
+    while True:
+        try:
+            playback_info = sp.current_playback()
+
+            if playback_info and playback_info.get('is_playing'):
+                total_duration = playback_info['item']['duration_ms'] / 1000
+                current_time = playback_info['progress_ms'] / 1000
+
+                print(f"🎵 Playing: {playback_info['item']['name']} ({current_time:.1f}s / {total_duration:.1f}s)")
+
+                # If the song is about to end, trigger the next recommendation
+                if (total_duration - current_time) <= 11:
+                    print("⏱ Song ending soon, getting next recommendation...")
+                    recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
+
+                    thread = threading.Thread(
+                        target=get_and_speak_recommendation,
+                        args=(current_emotion, recommendation_data),
+                        daemon=True
+                    )
+                    thread.start()
+
+                    # Sleep to avoid double-triggering during the same song end
+                    time.sleep(10)
+
+            else:
+                print("🟡 No song currently playing.")
+
+        except Exception as e:
+            print(f"Error checking Spotify playback: {e}")
+
+        # Wait a few seconds before checking again
+        time.sleep(5)
+
+# Start playback monitor in background
+spotify_thread = threading.Thread(target=monitor_spotify_playback, daemon=True)
+spotify_thread.start()
+
 # --- 5. Home Screen ---
 def show_home_screen():
     home_width, home_height = 800, 600
