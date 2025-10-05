@@ -116,7 +116,7 @@ def add_song_to_divhacks_playlist(track_uri):
             # If still not found, create a new one
             if DIVHACKS_PLAYLIST_ID is None:
                 print("Creating new 'DivHacks' playlist...")
-                playlist = sp.user_playlist_create(user=user_id, name="DivHacks", public=True, description="Songs recommended by the AI DJ based on current emotion.")
+                playlist = sp.user_playlist_create(user=user_id, name="DivHacks", public=True, description="MoodSwing DJ's recommended songs! Enjoy :)")
                 DIVHACKS_PLAYLIST_ID = playlist['id']
                 print(f"Playlist 'DivHacks' created with ID: {DIVHACKS_PLAYLIST_ID}")
 
@@ -250,146 +250,221 @@ def get_and_speak_recommendation(emotion, recommendation_data):
         recommendation_data[2] = ""
 
 
-# --- 5. Main Video Processing Loop ---
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    print("Error: Could not open webcam.")
-    exit()
+# --- 5. Home Screen ---
+def show_home_screen():
+    """Display a beautiful home screen with options"""
+    home_width, home_height = 800, 600
+    home_frame = np.zeros((home_height, home_width, 3), dtype=np.uint8)
+    
+    # Spotify colors
+    spotify_dark = (25, 20, 20)  # #191414
+    spotify_green = (29, 185, 84)  # #1DB954
+    spotify_light_green = (30, 215, 96)  # #1ED760
+    spotify_text = (255, 255, 255)  # White text
+    spotify_gray = (179, 179, 179)  # #B3B3B3
+    
+    # Background
+    home_frame[:] = spotify_dark
+    
+    # Title
+    cv2.putText(home_frame, "MoodSwing", (home_width//2 - 150, 150), cv2.FONT_HERSHEY_SIMPLEX, 2.5, spotify_light_green, 3)
+    cv2.putText(home_frame, "Emotion-Based Personalized DJ", (home_width//2 - 200, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, spotify_text, 2)
+    
+    # Decorative line
+    cv2.rectangle(home_frame, (home_width//2 - 150, 220), (home_width//2 + 150, 222), spotify_green, -1)
+    
+    # Options
+    cv2.putText(home_frame, "Press 'S' to Start", (home_width//2 - 120, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.0, spotify_text, 2)
+    cv2.putText(home_frame, "Press 'Q' to Quit", (home_width//2 - 100, 350), cv2.FONT_HERSHEY_SIMPLEX, 1.0, spotify_gray, 2)
+    
+    # Features list
+    cv2.putText(home_frame, "Features:", (50, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.8, spotify_light_green, 2)
+    cv2.putText(home_frame, "- Real-time emotion detection", (70, 480), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
+    cv2.putText(home_frame, "- AI-powered music recommendations", (70, 505), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
+    cv2.putText(home_frame, "- Spotify playback and playlist integration", (70, 530), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
+    cv2.putText(home_frame, "- ElevenLabs DJ Narration", (70, 555), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
+    
+    # Spotify logo area (simplified)
+    cv2.circle(home_frame, (home_width - 100, 100), 30, spotify_green, -1)
+    cv2.circle(home_frame, (home_width - 100, 100), 30, spotify_dark, 3)
+    
+    # Play button in logo
+    play_center_x, play_center_y = home_width - 100, 100
+    play_points = np.array([
+        [play_center_x - 8, play_center_y - 12],
+        [play_center_x - 8, play_center_y + 12],
+        [play_center_x + 12, play_center_y]
+    ], np.int32)
+    cv2.fillPoly(home_frame, [play_points], spotify_dark)
+    
+    return home_frame
 
-print("\nStarting webcam feed...")
-print("Press 's' to get a song recommendation based on your current emotion.")
-print("Press 'q' to quit.")
+def start_camera_mode():
+    """Start the camera and emotion detection mode"""
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: Could not open webcam.")
+        return False
+
+    print("\nStarting webcam feed...")
+    print("Press 's' to get a song recommendation based on your current emotion.")
+    print("Press 'q' to return to home screen.")
+
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+
+        output = yolo_model(frame, verbose=False)
+        detections = Detections.from_ultralytics(output[0])
+
+        if len(detections.xyxy) == 0:
+            current_emotion = "neutral"
+
+        for box in detections.xyxy:
+            x1, y1, x2, y2 = map(int, box)
+            padding = 20
+            x1, y1 = max(0, x1 - padding), max(0, y1 - padding)
+            x2, y2 = min(frame.shape[1], x2 + padding), min(frame.shape[0], y2 + padding)
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            face = frame[y1:y2, x1:x2]
+            if face.size == 0: continue
+                
+            try:
+                analysis = DeepFace.analyze(face, actions=['emotion'], enforce_detection=False)
+                current_emotion = analysis[0]['dominant_emotion']
+                status_text = f"Emotion: {current_emotion.capitalize()}"
+                status_color = (255, 255, 0)
+            except:
+                status_text = "Analyzing..."
+                status_color = (0, 0, 255)
+
+            cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+        # Add instructions overlay
+        instructions_y = frame.shape[0] - 80
+        cv2.rectangle(frame, (10, instructions_y - 40), (500, instructions_y + 50), (25, 20, 20), -1)  # Dark background
+        cv2.rectangle(frame, (10, instructions_y - 40), (500, instructions_y + 50), (29, 185, 84), 2)  # Green border
+        
+        # Instructions text
+        cv2.putText(frame, "Press 'S' for song recommendation", (20, instructions_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(frame, "Press 'Q' to return to home", (20, instructions_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (179, 179, 179), 2)
+
+        if recommendation_data[0]:
+            # Spotify-themed interface
+            interface_width, interface_height = 520, 160
+            start_x = frame.shape[1] - interface_width - 10
+            start_y = 10
+            
+            # Spotify colors: Dark background (#191414), Green accent (#1DB954)
+            spotify_dark = (25, 20, 20)  # #191414
+            spotify_green = (29, 185, 84)  # #1DB954
+            spotify_light_green = (30, 215, 96)  # #1ED760
+            spotify_text = (255, 255, 255)  # White text
+            spotify_gray = (179, 179, 179)  # #B3B3B3
+            
+            # Main interface background
+            cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
+            
+            # Spotify green border
+            cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
+            
+            # Add Spotify-style rounded corners effect (simplified)
+            cv2.circle(frame, (start_x + 5, start_y + 5), 5, spotify_dark, -1)
+            cv2.circle(frame, (start_x + interface_width - 5, start_y + 5), 5, spotify_dark, -1)
+            cv2.circle(frame, (start_x + 5, start_y + interface_height - 5), 5, spotify_dark, -1)
+            cv2.circle(frame, (start_x + interface_width - 5, start_y + interface_height - 5), 5, spotify_dark, -1)
+            
+            # Spotify green accent line
+            cv2.rectangle(frame, (start_x + 10, start_y + 25), (start_x + 30, start_y + 27), spotify_green, -1)
+            
+            # Emotion text with FONT_HERSHEY_SIMPLEX
+            cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
+            
+            # Song title with Spotify green
+            cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_light_green, 2)
+            
+            # Why text in gray
+            cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_gray, 2)
+            
+            # Add Spotify-style play button (triangle)
+            play_center_x = start_x + interface_width - 30
+            play_center_y = start_y + 30
+            
+            # Draw play button background circle
+            cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_green, -1)
+            cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_dark, 2)
+            
+            # Draw play triangle inside the circle
+            play_points = np.array([
+                [play_center_x - 4, play_center_y - 6],  # Left point
+                [play_center_x - 4, play_center_y + 6],  # Bottom left
+                [play_center_x + 6, play_center_y]       # Right point
+            ], np.int32)
+            cv2.fillPoly(frame, [play_points], spotify_dark)
+
+        cv2.imshow('AI DJ App - Home', frame)
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            cap.release()
+            cv2.destroyAllWindows()
+            return True  # Return to home screen
+        if key == ord('s'):
+            recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait..."]
+            
+            # Show loading state with Spotify theme
+            interface_width, interface_height = 520, 160
+            start_x = frame.shape[1] - interface_width - 10
+            start_y = 10
+            
+            # Spotify colors
+            spotify_dark = (25, 20, 20)  # #191414
+            spotify_green = (29, 185, 84)  # #1DB954
+            spotify_text = (255, 255, 255)  # White text
+            
+            # Loading interface background
+            cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
+            cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
+            
+            # Loading text
+            cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
+            cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_green, 2)
+            cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (179, 179, 179), 2)
+            
+            cv2.imshow('AI DJ App - Home', frame)
+            cv2.waitKey(1)
+            
+            thread = threading.Thread(target=get_and_speak_recommendation, args=(current_emotion, recommendation_data))
+            thread.start()
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+# Show home screen
+print("Starting AI DJ App...")
+print("Loading home screen...")
 
 current_emotion = "neutral"
 recommendation_data = ["", "", ""]
 
+# Main application loop
 while True:
-    success, frame = cap.read()
-    if not success:
-        break
-
-    output = yolo_model(frame, verbose=False)
-    detections = Detections.from_ultralytics(output[0])
-
-    if len(detections.xyxy) == 0:
-        current_emotion = "neutral"
-
-    for box in detections.xyxy:
-        x1, y1, x2, y2 = map(int, box)
-        padding = 20
-        x1, y1 = max(0, x1 - padding), max(0, y1 - padding)
-        x2, y2 = min(frame.shape[1], x2 + padding), min(frame.shape[0], y2 + padding)
-
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        
-        face = frame[y1:y2, x1:x2]
-        if face.size == 0: continue
-            
-        try:
-            analysis = DeepFace.analyze(face, actions=['emotion'], enforce_detection=False)
-            current_emotion = analysis[0]['dominant_emotion']
-            status_text = f"Emotion: {current_emotion.capitalize()}"
-            status_color = (255, 255, 0)
-        except:
-            status_text = "Analyzing..."
-            status_color = (0, 0, 255)
-
-        cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
-
-    # Add instructions overlay
-    instructions_y = frame.shape[0] - 60
-    cv2.rectangle(frame, (10, instructions_y - 25), (400, instructions_y + 35), (25, 20, 20), -1)  # Dark background
-    cv2.rectangle(frame, (10, instructions_y - 25), (400, instructions_y + 35), (29, 185, 84), 2)  # Green border
+    # Show home screen
+    home_frame = show_home_screen()
+    cv2.imshow('AI DJ App - Home', home_frame)
     
-    # Instructions text
-    cv2.putText(frame, "Press 'S' for song recommendation", (20, instructions_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    cv2.putText(frame, "Press 'Q' to quit", (20, instructions_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (179, 179, 179), 2)
-
-    if recommendation_data[0]:
-        # Spotify-themed interface
-        interface_width, interface_height = 520, 160
-        start_x = frame.shape[1] - interface_width - 10
-        start_y = 10
-        
-        # Spotify colors: Dark background (#191414), Green accent (#1DB954)
-        spotify_dark = (25, 20, 20)  # #191414
-        spotify_green = (29, 185, 84)  # #1DB954
-        spotify_light_green = (30, 215, 96)  # #1ED760
-        spotify_text = (255, 255, 255)  # White text
-        spotify_gray = (179, 179, 179)  # #B3B3B3
-        
-        # Main interface background
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
-        
-        # Spotify green border
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
-        
-        # Add Spotify-style rounded corners effect (simplified)
-        cv2.circle(frame, (start_x + 5, start_y + 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + interface_width - 5, start_y + 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + 5, start_y + interface_height - 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + interface_width - 5, start_y + interface_height - 5), 5, spotify_dark, -1)
-        
-        # Spotify green accent line
-        cv2.rectangle(frame, (start_x + 10, start_y + 25), (start_x + 30, start_y + 27), spotify_green, -1)
-        
-        # Emotion text with FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
-        
-        # Song title with Spotify green
-        cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_light_green, 2)
-        
-        # Why text in gray
-        cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_gray, 2)
-        
-        # Add Spotify-style play button (triangle)
-        play_center_x = start_x + interface_width - 30
-        play_center_y = start_y + 30
-        
-        # Draw play button background circle
-        cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_green, -1)
-        cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_dark, 2)
-        
-        # Draw play triangle inside the circle
-        play_points = np.array([
-            [play_center_x - 4, play_center_y - 6],  # Left point
-            [play_center_x - 4, play_center_y + 6],  # Bottom left
-            [play_center_x + 6, play_center_y]       # Right point
-        ], np.int32)
-        cv2.fillPoly(frame, [play_points], spotify_dark)
-
-    cv2.imshow('AI DJ App', frame)
-
     key = cv2.waitKey(1) & 0xFF
-    if key == ord('q'):
-        break
     if key == ord('s'):
-        recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait..."]
-        
-        # Show loading state with Spotify theme
-        interface_width, interface_height = 520, 160
-        start_x = frame.shape[1] - interface_width - 10
-        start_y = 10
-        
-        # Spotify colors
-        spotify_dark = (25, 20, 20)  # #191414
-        spotify_green = (29, 185, 84)  # #1DB954
-        spotify_text = (255, 255, 255)  # White text
-        
-        # Loading interface background
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
-        
-        # Loading text
-        cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
-        cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_green, 2)
-        cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (179, 179, 179), 2)
-        
-        cv2.imshow('AI DJ App', frame)
-        cv2.waitKey(1)
-        
-        thread = threading.Thread(target=get_and_speak_recommendation, args=(current_emotion, recommendation_data))
-        thread.start()
+        cv2.destroyWindow('AI DJ App - Home')
+        if start_camera_mode():
+            continue  # Return to home screen
+        else:
+            break  # Exit if camera failed
+    elif key == ord('q'):
+        print("Exiting application...")
+        break
 
-cap.release()
 cv2.destroyAllWindows()
