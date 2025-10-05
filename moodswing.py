@@ -578,6 +578,36 @@ def start_camera_mode():
     cv2.destroyAllWindows()
     return False
 
+# --- Spotify Playback Monitor (auto-next recommendation) ---
+import time
+
+def monitor_spotify_playback():
+    global current_emotion, recommendation_data
+
+    while True:
+        try:
+            playback_info = sp.current_playback()
+            if playback_info and playback_info.get('is_playing'):
+                total_duration = playback_info['item']['duration_ms'] / 1000
+                current_time = playback_info['progress_ms'] / 1000
+                # If the song is about to end, trigger the next recommendation once per end window
+                if (total_duration - current_time) <= 23 and (total_duration - current_time) >= 16:
+                    recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
+                    thread = threading.Thread(
+                        target=get_and_speak_recommendation,
+                        args=(current_emotion, recommendation_data),
+                        daemon=True,
+                    )
+                    thread.start()
+                    time.sleep(20)
+        except Exception:
+            pass
+
+        time.sleep(7)
+
+spotify_thread = threading.Thread(target=monitor_spotify_playback, daemon=True)
+spotify_thread.start()
+
 # --- Main Application Loop ---
 print("Starting MoodSwing DJ App...")
 print("Loading home screen...")
