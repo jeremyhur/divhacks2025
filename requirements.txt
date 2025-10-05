@@ -1,0 +1,13 @@
+# Project dependencies for divhacks2025
+# Install with: /usr/bin/python3 -m pip install --upgrade -r requirements.txt
+
+ultralytics
+opencv-python
+numpy
+huggingface_hub
+supervision
+deepface
+torch
+google-generativeai
+elevenlabs
+spotipy
