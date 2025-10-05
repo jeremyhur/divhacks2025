@@ -1,6 +1,10 @@
 # --- 0. Setup ---
 # pip install ultralytics opencv-python numpy huggingface_hub supervision deepface google-generativeai elevenlabs spotipy
 
+# Suppress macOS text input warnings
+import os
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
 # --- 1. Load Libraries ---
 try:
     import cv2
@@ -258,7 +262,7 @@ def get_and_speak_recommendation(emotion, recommendation_data):
             voice_id="IKne3meq5aSn9XLyUdCD",
             model_id="eleven_multilingual_v2"
         )
-        print("Playing audio...")
+        print("DJ Narrating...")
         play(audio)
         
         # NOW play the song after DJ finishes talking
@@ -286,12 +290,69 @@ def show_home_screen():
     
     home_frame[:] = spotify_dark
     
-    cv2.putText(home_frame, "MoodSwing", (home_width//2 - 150, 150), cv2.FONT_HERSHEY_SIMPLEX, 2.5, spotify_light_green, 3)
-    cv2.putText(home_frame, "Emotion-Based Personalized DJ", (home_width//2 - 200, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, spotify_text, 2)
-    cv2.rectangle(home_frame, (home_width//2 - 150, 220), (home_width//2 + 150, 222), spotify_green, -1)
-    
-    cv2.putText(home_frame, "Press 'S' to Start", (home_width//2 - 120, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.0, spotify_text, 2)
-    cv2.putText(home_frame, "Press 'Q' to Quit", (home_width//2 - 100, 350), cv2.FONT_HERSHEY_SIMPLEX, 1.0, spotify_gray, 2)
+    # --- Load and display logo image ---
+    logo_path = "moodswinglogo-removebg-preview.png"  # or "assets/logo.png" if it's in a subfolder
+    if os.path.exists(logo_path):
+        logo = cv2.imread(logo_path, cv2.IMREAD_UNCHANGED)
+        if logo is not None:
+            # Resize logo to fit the frame nicely
+            logo = cv2.resize(logo, (300, 250))  # adjust size as needed
+
+            # Choose where to display (top-left corner here)
+            x_offset, y_offset = 240, 5
+            y1, y2 = y_offset, y_offset + logo.shape[0]
+            x1, x2 = x_offset, x_offset + logo.shape[1]
+
+            # Handle transparency if logo has alpha channel
+            if logo.shape[2] == 4:
+                alpha_logo = logo[:, :, 3] / 255.0
+                alpha_background = 1.0 - alpha_logo
+                for c in range(0, 3):
+                    home_frame[y1:y2, x1:x2, c] = (
+                        alpha_logo * logo[:, :, c] +
+                        alpha_background * home_frame[y1:y2, x1:x2, c]
+                    )
+            else:
+                home_frame[y1:y2, x1:x2] = logo
+        else:
+            print("Warning: Could not load logo image.")
+    else:
+        print("Warning: logo.png not found.")
+
+
+
+    # Define text parameters
+    spotify_green = (29, 185, 84)
+    spotify_text = (255, 255, 255)
+    spotify_gray = (150, 150, 150)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    # --- Title Text ---
+    title = "Emotion-Based Personalized DJ"
+    (text_w, text_h), _ = cv2.getTextSize(title, font, 0.8, 2)
+    cv2.putText(home_frame, title, ((home_width - text_w)//2, 240), font, 0.8, spotify_text, 2)
+
+    # --- Divider Line ---
+    line_y = 260
+    line_width = 300
+    cv2.rectangle(
+        home_frame,
+        ((home_width - line_width)//2, line_y),
+        ((home_width + line_width)//2, line_y + 2),
+        spotify_green,
+        -1
+    )
+
+    # --- "Press 'S' to Start" ---
+    start_text = "Press 'S' to Start"
+    (text_w, text_h), _ = cv2.getTextSize(start_text, font, 1.0, 2)
+    cv2.putText(home_frame, start_text, ((home_width - text_w)//2, 300), font, 1.0, spotify_text, 2)
+
+    # --- "Press 'Q' to Quit" ---
+    quit_text = "Press 'Q' to Quit"
+    (text_w, text_h), _ = cv2.getTextSize(quit_text, font, 1.0, 2)
+    cv2.putText(home_frame, quit_text, ((home_width - text_w)//2, 350), font, 1.0, spotify_gray, 2)
+
     
     cv2.putText(home_frame, "Features:", (50, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.8, spotify_light_green, 2)
     cv2.putText(home_frame, "- Real-time emotion detection", (70, 480), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
@@ -318,7 +379,7 @@ def start_camera_mode():
     print("Press 's' to get a song recommendation based on your current emotion.")
     print("Press 'q' to return to home screen.")
 
-    global current_emotion
+    global current_emotion, last_recommendation_emotion
     
     while True:
         success, frame = cap.read()
@@ -329,26 +390,39 @@ def start_camera_mode():
         detections = Detections.from_ultralytics(output[0])
 
         face_detected = False
+        faces = []
+        
+        # Collect all face boxes and calculate their areas
         for box in detections.xyxy:
-            face_detected = True
             x1, y1, x2, y2 = map(int, box)
+            area = (x2 - x1) * (y2 - y1)
+            faces.append((box, area, x1, y1, x2, y2))
+        
+        # Sort faces by area (largest first)
+        faces.sort(key=lambda x: x[1], reverse=True)
+        
+        for i, (box, area, x1, y1, x2, y2) in enumerate(faces):
+            face_detected = True
             padding = 20
             x1, y1 = max(0, x1 - padding), max(0, y1 - padding)
             x2, y2 = min(frame.shape[1], x2 + padding), min(frame.shape[0], y2 + padding)
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            face = frame[y1:y2, x1:x2]
-            if face.size == 0: continue
-                
-            try:
-                analysis = DeepFace.analyze(face, actions=['emotion'], enforce_detection=False)
-                current_emotion = analysis[0]['dominant_emotion']
-                status_text = f"Emotion: {current_emotion.capitalize()}"
-            except Exception:
-                status_text = "Analyzing..."
+            # Main face (largest) = Green, Background faces = Red
+            if i == 0:  # Largest face
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green
+                face = frame[y1:y2, x1:x2]
+                if face.size == 0: continue
+                    
+                try:
+                    analysis = DeepFace.analyze(face, actions=['emotion'], enforce_detection=False)
+                    current_emotion = analysis[0]['dominant_emotion']
+                    status_text = f"Emotion: {current_emotion.capitalize()}"
+                except Exception:
+                    status_text = "Analyzing..."
 
-            cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+            else:  # Background faces
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)  # Red
 
         if not face_detected:
             current_emotion = "neutral"
@@ -358,6 +432,33 @@ def start_camera_mode():
         cv2.rectangle(frame, (10, instructions_y - 40), (500, instructions_y + 50), (29, 185, 84), 2)
         cv2.putText(frame, "Press 'S' for song recommendation", (20, instructions_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         cv2.putText(frame, "Press 'Q' to return to home", (20, instructions_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (179, 179, 179), 2)
+
+        # --- Add MoodSwing logo to bottom right corner ---
+        logo_path = "moodswinglogo-removebg-preview.png"
+        if os.path.exists(logo_path):
+            logo = cv2.imread(logo_path, cv2.IMREAD_UNCHANGED)
+            if logo is not None:
+                # Resize logo for webcam corner (smaller size)
+                logo = cv2.resize(logo, (80, 60))
+                
+                # Position in bottom right corner
+                logo_x = frame.shape[1] - logo.shape[1] - 10
+                logo_y = frame.shape[0] - logo.shape[0] - 10
+                
+                y1, y2 = logo_y, logo_y + logo.shape[0]
+                x1, x2 = logo_x, logo_x + logo.shape[1]
+                
+                # Handle transparency if logo has alpha channel
+                if logo.shape[2] == 4:
+                    alpha_logo = logo[:, :, 3] / 255.0
+                    alpha_background = 1.0 - alpha_logo
+                    for c in range(0, 3):
+                        frame[y1:y2, x1:x2, c] = (
+                            alpha_logo * logo[:, :, c] +
+                            alpha_background * frame[y1:y2, x1:x2, c]
+                        )
+                else:
+                    frame[y1:y2, x1:x2] = logo
 
         if recommendation_data[0]:
             interface_width, interface_height = 700, 200
@@ -386,36 +487,71 @@ def start_camera_mode():
             # --- Adjusted text positions ---
             text_start_x = art_x + 120 
             cv2.rectangle(frame, (text_start_x, start_y + 25), (text_start_x + 20, start_y + 27), spotify_green, -1)
-            cv2.putText(frame, recommendation_data[1], (text_start_x + 30, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
-            cv2.putText(frame, recommendation_data[0], (text_start_x, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_light_green, 2)
-            cv2.putText(frame, recommendation_data[2], (text_start_x, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_gray, 2)
+            
+            # Show latched emotion captured at time of request
+            emotion_text = f"Detected: {(last_recommendation_emotion or current_emotion).capitalize()}"
+            cv2.putText(frame, emotion_text, (text_start_x + 30, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_light_green, 2)
+            
+            # Show reasoning
+            cv2.putText(frame, recommendation_data[1], (text_start_x + 30, start_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_text, 2)
+            
+            # Show song title
+            cv2.putText(frame, recommendation_data[0], (text_start_x, start_y + 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_light_green, 2)
+            
+            # Show why
+            cv2.putText(frame, recommendation_data[2], (text_start_x, start_y + 125), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_gray, 2)
 
         cv2.imshow('MoodSwing DJ', frame)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
-            # Add glowing border effect for Q key with slower fade
-            for i in range(5):
-                # Create glowing effect with multiple border layers
+            # Add breathing glow effect for Q key
+            for i in range(8):
+                # Create breathing glow effect with varying intensity
                 glow_frame = frame.copy()
-                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
-                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+                alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+                
+                # Multiple translucent layers for ethereal effect
+                for layer in range(3):
+                    thickness = 15 - layer * 3
+                    color_intensity = int(intensity * (1 - layer * 0.2))
+                    cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                                (0, color_intensity, color_intensity), thickness)
+                
+                # Soft inner glow
+                cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                            (255, 255, 255), 2)
+                
                 cv2.imshow('MoodSwing DJ', glow_frame)
-                cv2.waitKey(100)  # Slower pause for smoother fade
+                cv2.waitKey(80)  # Breathing rhythm
             
             cap.release()
             cv2.destroyAllWindows()
             return True
         if key == ord('s'):
-            # Add glowing border effect for S key with slower fade
-            for i in range(5):
-                # Create glowing effect with multiple border layers
+            # Add breathing glow effect for S key
+            for i in range(8):
+                # Create breathing glow effect with varying intensity
                 glow_frame = frame.copy()
-                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
-                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+                alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+                
+                # Multiple translucent layers for ethereal effect
+                for layer in range(3):
+                    thickness = 15 - layer * 3
+                    color_intensity = int(intensity * (1 - layer * 0.2))
+                    cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                                (0, color_intensity, 0), thickness)
+                
+                # Soft inner glow
+                cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                            (255, 255, 255), 2)
+                
                 cv2.imshow('MoodSwing DJ', glow_frame)
-                cv2.waitKey(100)  # Slower pause for smoother fade
+                cv2.waitKey(80)  # Breathing rhythm
             
+            last_recommendation_emotion = current_emotion
             recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
             
             loading_frame = frame.copy()
@@ -435,18 +571,49 @@ def start_camera_mode():
             cv2.imshow('MoodSwing DJ', loading_frame)
             cv2.waitKey(1)
             
-            thread = threading.Thread(target=get_and_speak_recommendation, args=(current_emotion, recommendation_data))
+            thread = threading.Thread(target=get_and_speak_recommendation, args=(last_recommendation_emotion, recommendation_data))
             thread.start()
 
     cap.release()
     cv2.destroyAllWindows()
     return False
 
+# --- Spotify Playback Monitor (auto-next recommendation) ---
+import time
+
+def monitor_spotify_playback():
+    global current_emotion, recommendation_data
+
+    while True:
+        try:
+            playback_info = sp.current_playback()
+            if playback_info and playback_info.get('is_playing'):
+                total_duration = playback_info['item']['duration_ms'] / 1000
+                current_time = playback_info['progress_ms'] / 1000
+                # If the song is about to end, trigger the next recommendation once per end window
+                if (total_duration - current_time) <= 23 and (total_duration - current_time) >= 16:
+                    recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
+                    thread = threading.Thread(
+                        target=get_and_speak_recommendation,
+                        args=(current_emotion, recommendation_data),
+                        daemon=True,
+                    )
+                    thread.start()
+                    time.sleep(20)
+        except Exception:
+            pass
+
+        time.sleep(7)
+
+spotify_thread = threading.Thread(target=monitor_spotify_playback, daemon=True)
+spotify_thread.start()
+
 # --- Main Application Loop ---
 print("Starting MoodSwing DJ App...")
 print("Loading home screen...")
 
 current_emotion = "neutral"
+last_recommendation_emotion = None
 recommendation_data = ["", "", "", None] # [Song, Reason, Why, AlbumArt_Image]
 
 while True:
@@ -455,27 +622,51 @@ while True:
     
     key = cv2.waitKey(1) & 0xFF
     if key == ord('s'):
-        # Add glowing border effect for S key on home screen with slower fade
-        for i in range(5):
-            # Create glowing effect with multiple border layers
+        # Add breathing glow effect for S key on home screen
+        for i in range(8):
+            # Create breathing glow effect with varying intensity
             glow_frame = home_frame.copy()
-            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
-            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+            alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+            
+            # Multiple translucent layers for ethereal effect
+            for layer in range(3):
+                thickness = 15 - layer * 3
+                color_intensity = int(intensity * (1 - layer * 0.2))
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                            (0, color_intensity, 0), thickness)
+            
+            # Soft inner glow
+            cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                        (255, 255, 255), 2)
+            
             cv2.imshow('MoodSwing DJ', glow_frame)
-            cv2.waitKey(100)  # Slower pause for smoother fade
+            cv2.waitKey(80)  # Breathing rhythm
         
         cv2.destroyWindow('MoodSwing DJ')
         if not start_camera_mode():
             break
     elif key == ord('q'):
-        # Add glowing border effect for Q key on home screen with slower fade
-        for i in range(5):
-            # Create glowing effect with multiple border layers
+        # Add breathing glow effect for Q key on home screen
+        for i in range(8):
+            # Create breathing glow effect with varying intensity
             glow_frame = home_frame.copy()
-            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
-            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+            alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+            
+            # Multiple translucent layers for ethereal effect
+            for layer in range(3):
+                thickness = 15 - layer * 3
+                color_intensity = int(intensity * (1 - layer * 0.2))
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                            (0, color_intensity, color_intensity), thickness)
+            
+            # Soft inner glow
+            cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                        (255, 255, 255), 2)
+            
             cv2.imshow('MoodSwing DJ', glow_frame)
-            cv2.waitKey(100)  # Slower pause for smoother fade
+            cv2.waitKey(80)  # Breathing rhythm
         
         print("Exiting application...")
         break
