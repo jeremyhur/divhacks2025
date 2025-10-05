@@ -292,7 +292,7 @@ def monitor_spotify_playback():
                 print(f"🎵 Playing: {playback_info['item']['name']} ({current_time:.1f}s / {total_duration:.1f}s)")
 
                 # If the song is about to end, trigger the next recommendation
-                if (total_duration - current_time) <= 11:
+                if (total_duration - current_time) <= 23 and (total_duration - current_time) >= 16:
                     print("⏱ Song ending soon, getting next recommendation...")
                     recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
 
@@ -304,7 +304,7 @@ def monitor_spotify_playback():
                     thread.start()
 
                     # Sleep to avoid double-triggering during the same song end
-                    time.sleep(10)
+                    time.sleep(20)
 
             else:
                 print("🟡 No song currently playing.")
@@ -313,7 +313,7 @@ def monitor_spotify_playback():
             print(f"Error checking Spotify playback: {e}")
 
         # Wait a few seconds before checking again
-        time.sleep(5)
+        time.sleep(7)
 
 # Start playback monitor in background
 spotify_thread = threading.Thread(target=monitor_spotify_playback, daemon=True)
