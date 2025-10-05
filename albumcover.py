@@ -394,27 +394,51 @@ def start_camera_mode():
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
-            # Add glowing border effect for Q key with slower fade
-            for i in range(5):
-                # Create glowing effect with multiple border layers
+            # Add breathing glow effect for Q key
+            for i in range(8):
+                # Create breathing glow effect with varying intensity
                 glow_frame = frame.copy()
-                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
-                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+                alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+                
+                # Multiple translucent layers for ethereal effect
+                for layer in range(3):
+                    thickness = 15 - layer * 3
+                    color_intensity = int(intensity * (1 - layer * 0.2))
+                    cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                                (0, color_intensity, color_intensity), thickness)
+                
+                # Soft inner glow
+                cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                            (255, 255, 255), 2)
+                
                 cv2.imshow('MoodSwing DJ', glow_frame)
-                cv2.waitKey(100)  # Slower pause for smoother fade
+                cv2.waitKey(80)  # Breathing rhythm
             
             cap.release()
             cv2.destroyAllWindows()
             return True
         if key == ord('s'):
-            # Add glowing border effect for S key with slower fade
-            for i in range(5):
-                # Create glowing effect with multiple border layers
+            # Add breathing glow effect for S key
+            for i in range(8):
+                # Create breathing glow effect with varying intensity
                 glow_frame = frame.copy()
-                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
-                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+                alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+                
+                # Multiple translucent layers for ethereal effect
+                for layer in range(3):
+                    thickness = 15 - layer * 3
+                    color_intensity = int(intensity * (1 - layer * 0.2))
+                    cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                                (0, color_intensity, 0), thickness)
+                
+                # Soft inner glow
+                cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                            (255, 255, 255), 2)
+                
                 cv2.imshow('MoodSwing DJ', glow_frame)
-                cv2.waitKey(100)  # Slower pause for smoother fade
+                cv2.waitKey(80)  # Breathing rhythm
             
             recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
             
@@ -455,27 +479,51 @@ while True:
     
     key = cv2.waitKey(1) & 0xFF
     if key == ord('s'):
-        # Add glowing border effect for S key on home screen with slower fade
-        for i in range(5):
-            # Create glowing effect with multiple border layers
+        # Add breathing glow effect for S key on home screen
+        for i in range(8):
+            # Create breathing glow effect with varying intensity
             glow_frame = home_frame.copy()
-            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
-            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+            alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+            
+            # Multiple translucent layers for ethereal effect
+            for layer in range(3):
+                thickness = 15 - layer * 3
+                color_intensity = int(intensity * (1 - layer * 0.2))
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                            (0, color_intensity, 0), thickness)
+            
+            # Soft inner glow
+            cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                        (255, 255, 255), 2)
+            
             cv2.imshow('MoodSwing DJ', glow_frame)
-            cv2.waitKey(100)  # Slower pause for smoother fade
+            cv2.waitKey(80)  # Breathing rhythm
         
         cv2.destroyWindow('MoodSwing DJ')
         if not start_camera_mode():
             break
     elif key == ord('q'):
-        # Add glowing border effect for Q key on home screen with slower fade
-        for i in range(5):
-            # Create glowing effect with multiple border layers
+        # Add breathing glow effect for Q key on home screen
+        for i in range(8):
+            # Create breathing glow effect with varying intensity
             glow_frame = home_frame.copy()
-            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
-            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            intensity = int(50 + 30 * abs(np.sin(i * 0.5)))  # Breathing intensity
+            alpha = 0.3 + 0.2 * abs(np.sin(i * 0.3))  # Breathing transparency
+            
+            # Multiple translucent layers for ethereal effect
+            for layer in range(3):
+                thickness = 15 - layer * 3
+                color_intensity = int(intensity * (1 - layer * 0.2))
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), 
+                            (0, color_intensity, color_intensity), thickness)
+            
+            # Soft inner glow
+            cv2.rectangle(glow_frame, (10, 10), (glow_frame.shape[1] - 10, glow_frame.shape[0] - 10), 
+                        (255, 255, 255), 2)
+            
             cv2.imshow('MoodSwing DJ', glow_frame)
-            cv2.waitKey(100)  # Slower pause for smoother fade
+            cv2.waitKey(80)  # Breathing rhythm
         
         print("Exiting application...")
         break
