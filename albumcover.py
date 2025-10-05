@@ -360,8 +360,8 @@ def start_camera_mode():
         cv2.putText(frame, "Press 'Q' to return to home", (20, instructions_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (179, 179, 179), 2)
 
         if recommendation_data[0]:
-            interface_width, interface_height = 520, 160
-            start_x = frame.shape[1] - interface_width - 10
+            interface_width, interface_height = 700, 200
+            start_x = 10
             start_y = 10
             
             spotify_dark = (25, 20, 20)
@@ -394,15 +394,33 @@ def start_camera_mode():
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
+            # Add glowing border effect for Q key with slower fade
+            for i in range(5):
+                # Create glowing effect with multiple border layers
+                glow_frame = frame.copy()
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
+                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                cv2.imshow('MoodSwing DJ', glow_frame)
+                cv2.waitKey(100)  # Slower pause for smoother fade
+            
             cap.release()
             cv2.destroyAllWindows()
             return True
         if key == ord('s'):
+            # Add glowing border effect for S key with slower fade
+            for i in range(5):
+                # Create glowing effect with multiple border layers
+                glow_frame = frame.copy()
+                cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
+                cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+                cv2.imshow('MoodSwing DJ', glow_frame)
+                cv2.waitKey(100)  # Slower pause for smoother fade
+            
             recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait...", None]
             
             loading_frame = frame.copy()
-            interface_width, interface_height = 520, 160
-            start_x = loading_frame.shape[1] - interface_width - 10
+            interface_width, interface_height = 700, 200
+            start_x = 10
             start_y = 10
             spotify_dark = (25, 20, 20)
             spotify_green = (29, 185, 84)
@@ -437,10 +455,28 @@ while True:
     
     key = cv2.waitKey(1) & 0xFF
     if key == ord('s'):
+        # Add glowing border effect for S key on home screen with slower fade
+        for i in range(5):
+            # Create glowing effect with multiple border layers
+            glow_frame = home_frame.copy()
+            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 0), 8)  # Green glow
+            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            cv2.imshow('MoodSwing DJ', glow_frame)
+            cv2.waitKey(100)  # Slower pause for smoother fade
+        
         cv2.destroyWindow('MoodSwing DJ')
         if not start_camera_mode():
             break
     elif key == ord('q'):
+        # Add glowing border effect for Q key on home screen with slower fade
+        for i in range(5):
+            # Create glowing effect with multiple border layers
+            glow_frame = home_frame.copy()
+            cv2.rectangle(glow_frame, (5, 5), (glow_frame.shape[1] - 5, glow_frame.shape[0] - 5), (0, 255, 255), 8)  # Cyan glow
+            cv2.rectangle(glow_frame, (8, 8), (glow_frame.shape[1] - 8, glow_frame.shape[0] - 8), (255, 255, 255), 4)  # White inner
+            cv2.imshow('MoodSwing DJ', glow_frame)
+            cv2.waitKey(100)  # Slower pause for smoother fade
+        
         print("Exiting application...")
         break
 
