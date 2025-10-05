@@ -262,7 +262,7 @@ def get_and_speak_recommendation(emotion, recommendation_data):
             voice_id="IKne3meq5aSn9XLyUdCD",
             model_id="eleven_multilingual_v2"
         )
-        print("Playing audio...")
+        print("DJ Narrating...")
         play(audio)
         
         # NOW play the song after DJ finishes talking
