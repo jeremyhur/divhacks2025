@@ -17,9 +17,8 @@ import google.generativeai as genai
 from elevenlabs.client import ElevenLabs
 from elevenlabs.play import play
 import threading
-import spotipy # --- SPOTIFY --- Import Spotipy
-from spotipy.oauth2 import SpotifyOAuth # --- SPOTIFY --- Import for authentication
-import numpy as np
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
 # --- FIX for SSL: CERTIFICATE_VERIFY_FAILED ---
 try:
@@ -59,12 +58,19 @@ except KeyError:
     eleven_client = None
 
 # --- SPOTIFY --- Configure Spotipy
+DIVHACKS_PLAYLIST_ID = None 
 try:
-    # Set the scope: permissions your script is asking for.
-    # 'user-modify-playback-state' is needed to control playback.
-    scope = "user-read-playback-state user-modify-playback-state"
-    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    scope = "user-read-playback-state user-modify-playback-state playlist-modify-public playlist-modify-private"
+    
+    # --- ADD THIS PARAMETER to force the cache file name ---
+    cache_path = ".dj_cache_file" 
+    
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        scope=scope, 
+        cache_path=cache_path # Use the specified cache file
+    ))
     print("Spotify API configured successfully.")
+    
 except Exception as e:
     print(f"ERROR: Could not configure Spotify. Check environment variables. Details: {e}")
     sp = None
@@ -85,11 +91,48 @@ yolo_model = YOLO(model_path)
 print("Emotion recognition models will be downloaded on first analysis.")
 print("All models loaded.")
 
-# --- SPOTIFY --- New helper function to play a song
+# --- SPOTIFY --- New helper function to manage the "DivHacks" playlist
+def add_song_to_divhacks_playlist(track_uri):
+    global DIVHACKS_PLAYLIST_ID
+    if not sp or not track_uri:
+        print("Spotify not configured or no track URI provided. Cannot manage playlist.")
+        return
+
+    try:
+        # Step 1: Get the current user ID
+        user_id = sp.current_user()['id']
+
+        # Step 2: Check/Create the "DivHacks" playlist
+        if DIVHACKS_PLAYLIST_ID is None:
+            # Check for existing playlist by name
+            playlists = sp.current_user_playlists()
+            for playlist in playlists['items']:
+                if playlist['name'] == "DivHacks":
+                    DIVHACKS_PLAYLIST_ID = playlist['id']
+                    print("Found existing 'DivHacks' playlist.")
+                    break
+            
+            # If still not found, create a new one
+            if DIVHACKS_PLAYLIST_ID is None:
+                print("Creating new 'DivHacks' playlist...")
+                playlist = sp.user_playlist_create(user=user_id, name="DivHacks", public=True, description="Songs recommended by the AI DJ based on current emotion.")
+                DIVHACKS_PLAYLIST_ID = playlist['id']
+                print(f"Playlist 'DivHacks' created with ID: {DIVHACKS_PLAYLIST_ID}")
+
+        # Step 3: Add the song to the playlist
+        if DIVHACKS_PLAYLIST_ID:
+            sp.playlist_add_items(DIVHACKS_PLAYLIST_ID, [track_uri])
+            print(f"Added track to 'DivHacks' playlist.")
+
+    except Exception as e:
+        print(f"An error occurred while managing the Spotify playlist: {e}")
+
+
+# --- SPOTIFY --- Helper function to play a song and return its URI
 def play_song_on_spotify(song_title, artist_name):
     if not sp:
         print("Spotify not configured. Cannot play song.")
-        return
+        return None
 
     try:
         # Search for the track
@@ -99,7 +142,7 @@ def play_song_on_spotify(song_title, artist_name):
         tracks = results['tracks']['items']
         if not tracks:
             print(f"Could not find '{song_title}' by '{artist_name}' on Spotify.")
-            return
+            return None
 
         track_uri = tracks[0]['uri']
         
@@ -114,19 +157,17 @@ def play_song_on_spotify(song_title, artist_name):
         
         if not active_device_id:
             print("No active Spotify device found. Please open Spotify on a device.")
-            # Optional: Start playback on the first available device if none are active
-            # if devices and devices['devices']:
-            #    active_device_id = devices['devices'][0]['id']
 
         if active_device_id:
             print(f"Playing on device ID: {active_device_id}")
             sp.start_playback(device_id=active_device_id, uris=[track_uri])
             print(f"Playing '{song_title}' on Spotify.")
-        else:
-            print("Could not start playback. No devices available.")
+            
+        return track_uri # Return the URI for playlist addition
 
     except Exception as e:
         print(f"An error occurred with Spotify: {e}")
+        return None
 
 
 # --- 4. Helper Function for Song Recommendation & Narration ---
@@ -139,7 +180,7 @@ def get_and_speak_recommendation(emotion, recommendation_data):
 
     # Step 1: Get song data from Gemini
     prompt = f"""
-    You are a music recommendation expert across all genres, but mainly focused on pop, rock, and hip-hop. The user is currently feeling '{emotion}'.
+    You are a music recommendation expert. The user is currently feeling '{emotion}'.
     Please provide SHORT responses (max 4-5 words for reasoning, 3-4 words for why).
     Format your response EXACTLY like this:
     REASONING: [Very brief emotion validation - 4-5 words max]
@@ -191,7 +232,13 @@ def get_and_speak_recommendation(emotion, recommendation_data):
         
         # --- SPOTIFY --- Play the song after the narration is finished
         if song_title and artist_name:
-            play_song_on_spotify(song_title, artist_name)
+            # The play_song_on_spotify function now returns the track_uri
+            track_uri = play_song_on_spotify(song_title, artist_name)
+            
+            # --- NEW: Add song to the "DivHacks" playlist ---
+            if track_uri:
+                add_song_to_divhacks_playlist(track_uri)
+            # ---------------------------------------------------
         else:
             print("Could not parse song and artist to play on Spotify.")
 
@@ -246,69 +293,19 @@ while True:
             status_text = "Analyzing..."
             status_color = (0, 0, 255)
 
-        cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
-
-    # Add instructions overlay
-    instructions_y = frame.shape[0] - 60
-    cv2.rectangle(frame, (10, instructions_y - 25), (400, instructions_y + 35), (25, 20, 20), -1)  # Dark background
-    cv2.rectangle(frame, (10, instructions_y - 25), (400, instructions_y + 35), (29, 185, 84), 2)  # Green border
-    
-    # Instructions text
-    cv2.putText(frame, "Press 'S' for song recommendation", (20, instructions_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    cv2.putText(frame, "Press 'Q' to quit", (20, instructions_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (179, 179, 179), 2)
+        cv2.putText(frame, status_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, status_color, 2)
 
     if recommendation_data[0]:
-        # Spotify-themed interface
-        interface_width, interface_height = 520, 160
+        interface_width, interface_height = 500, 140
         start_x = frame.shape[1] - interface_width - 10
         start_y = 10
         
-        # Spotify colors: Dark background (#191414), Green accent (#1DB954)
-        spotify_dark = (25, 20, 20)  # #191414
-        spotify_green = (29, 185, 84)  # #1DB954
-        spotify_light_green = (30, 215, 96)  # #1ED760
-        spotify_text = (255, 255, 255)  # White text
-        spotify_gray = (179, 179, 179)  # #B3B3B3
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 0, 0), -1)
+        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), (0, 255, 255), 2)
         
-        # Main interface background
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
-        
-        # Spotify green border
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
-        
-        # Add Spotify-style rounded corners effect (simplified)
-        cv2.circle(frame, (start_x + 5, start_y + 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + interface_width - 5, start_y + 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + 5, start_y + interface_height - 5), 5, spotify_dark, -1)
-        cv2.circle(frame, (start_x + interface_width - 5, start_y + interface_height - 5), 5, spotify_dark, -1)
-        
-        # Spotify green accent line
-        cv2.rectangle(frame, (start_x + 10, start_y + 25), (start_x + 30, start_y + 27), spotify_green, -1)
-        
-        # Emotion text with FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
-        
-        # Song title with Spotify green
-        cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_light_green, 2)
-        
-        # Why text in gray
-        cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, spotify_gray, 2)
-        
-        # Add Spotify-style play button (triangle)
-        play_center_x = start_x + interface_width - 30
-        play_center_y = start_y + 30
-        
-        # Draw play button background circle
-        cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_green, -1)
-        cv2.circle(frame, (play_center_x, play_center_y), 12, spotify_dark, 2)
-        
-        # Draw play triangle inside the circle
-        play_points = np.array([
-            [play_center_x - 4, play_center_y - 6],  # Left point
-            [play_center_x - 4, play_center_y + 6],  # Bottom left
-            [play_center_x + 6, play_center_y]       # Right point
-        ], np.int32)
-        cv2.fillPoly(frame, [play_points], spotify_dark)
+        cv2.putText(frame, recommendation_data[1], (start_x + 10, start_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(frame, recommendation_data[0], (start_x + 10, start_y + 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, recommendation_data[2], (start_x + 10, start_y + 110), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 2)
 
     cv2.imshow('AI DJ App', frame)
 
@@ -317,29 +314,6 @@ while True:
         break
     if key == ord('s'):
         recommendation_data[:] = ["Getting recommendation...", "Analyzing emotions...", "Please wait..."]
-        
-        # Show loading state with Spotify theme
-        interface_width, interface_height = 520, 160
-        start_x = frame.shape[1] - interface_width - 10
-        start_y = 10
-        
-        # Spotify colors
-        spotify_dark = (25, 20, 20)  # #191414
-        spotify_green = (29, 185, 84)  # #1DB954
-        spotify_text = (255, 255, 255)  # White text
-        
-        # Loading interface background
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_dark, -1)
-        cv2.rectangle(frame, (start_x, start_y), (start_x + interface_width, start_y + interface_height), spotify_green, 3)
-        
-        # Loading text
-        cv2.putText(frame, recommendation_data[1], (start_x + 40, start_y + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_text, 2)
-        cv2.putText(frame, recommendation_data[0], (start_x + 15, start_y + 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, spotify_green, 2)
-        cv2.putText(frame, recommendation_data[2], (start_x + 15, start_y + 115), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (179, 179, 179), 2)
-        
-        cv2.imshow('AI DJ App', frame)
-        cv2.waitKey(1)
-        
         thread = threading.Thread(target=get_and_speak_recommendation, args=(current_emotion, recommendation_data))
         thread.start()
 
